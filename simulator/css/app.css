@@ -387,12 +387,74 @@
   color: #006600;
 }
 
-/* ========== DRAG PREVIEW ========== */
-#drag-preview {
-  position: fixed;
-  pointer-events: none;
-  z-index: 5000;
-  opacity: 0.7;
+/* ========== DROP ZONE ========== */
+.drop-zone {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 240, 232, 0.95);
+  z-index: 50;
+}
+
+.drop-zone.active {
+  background: rgba(0, 0, 128, 0.08);
+  border: 3px dashed #000080;
+}
+
+.drop-zone-content {
+  text-align: center;
+  padding: 30px;
+}
+
+.drop-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.drop-text {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: #000080;
+  margin-bottom: 6px;
+}
+
+.drop-hint {
+  font-size: 12px;
+  color: #808080;
+  margin-bottom: 16px;
+}
+
+.open-file-btn {
+  padding: 6px 24px !important;
+  font-size: 14px !important;
+  margin-bottom: 16px;
+}
+
+.drop-demos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-size: 11px;
+  color: #808080;
+}
+
+/* ========== TOOLBAR EXTRAS ========== */
+.open-btn {
+  background: #D0D0FF !important;
+}
+
+.toolbar-info {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--bg-darker);
+  padding: 0 8px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ========== CONTEXT MENU ========== */

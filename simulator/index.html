@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RetroSim PCB — Digital Circuit Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RetroSim — KiCad Schematic Viewer</title>
   <link rel="stylesheet" href="css/win95.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
@@ -14,24 +14,12 @@
       <div class="menu-item" data-menu="file">
         <span class="menu-label">File</span>
         <div class="menu-dropdown">
-          <div class="menu-entry" data-action="new">New Project</div>
-          <div class="menu-entry" data-action="open">Open...</div>
-          <div class="menu-entry" data-action="save">Save</div>
+          <div class="menu-entry" data-action="open">Open KiCad Schematic...</div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="export">Export PNG</div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="demo-486">Load Demo: i486 System</div>
-          <div class="menu-entry" data-action="demo-counter">Load Demo: 4-bit Counter</div>
-        </div>
-      </div>
-      <div class="menu-item" data-menu="edit">
-        <span class="menu-label">Edit</span>
-        <div class="menu-dropdown">
-          <div class="menu-entry" data-action="undo">Undo</div>
-          <div class="menu-entry" data-action="redo">Redo</div>
-          <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="delete">Delete Selection</div>
-          <div class="menu-entry" data-action="selectall">Select All</div>
+          <div class="menu-entry" data-action="demo-reset">Load Demo: Reset Circuit</div>
+          <div class="menu-entry" data-action="demo-cpu">Load Demo: i486 Block</div>
         </div>
       </div>
       <div class="menu-item" data-menu="view">
@@ -45,27 +33,12 @@
           <div class="menu-entry" data-action="toggle-labels">Toggle Pin Labels</div>
         </div>
       </div>
-      <div class="menu-item" data-menu="simulate">
-        <span class="menu-label">Simulate</span>
-        <div class="menu-dropdown">
-          <div class="menu-entry" data-action="sim-start">&#9654; Run</div>
-          <div class="menu-entry" data-action="sim-step">Step (1 cycle)</div>
-          <div class="menu-entry" data-action="sim-stop">&#9632; Stop</div>
-          <div class="menu-entry" data-action="sim-reset">Reset</div>
-          <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="sim-speed-slow">Speed: Slow</div>
-          <div class="menu-entry" data-action="sim-speed-normal">Speed: Normal</div>
-          <div class="menu-entry" data-action="sim-speed-fast">Speed: Fast</div>
-        </div>
-      </div>
       <div class="menu-item" data-menu="windows">
         <span class="menu-label">Windows</span>
         <div class="menu-dropdown">
-          <div class="menu-entry" data-action="win-library">Component Library</div>
+          <div class="menu-entry" data-action="win-components">Component List</div>
           <div class="menu-entry" data-action="win-properties">Properties</div>
-          <div class="menu-entry" data-action="win-waveform">Waveform Viewer</div>
           <div class="menu-entry" data-action="win-console">Console</div>
-          <div class="menu-entry" data-action="win-boards">Board Manager</div>
         </div>
       </div>
       <div class="menu-item" data-menu="help">
@@ -75,91 +48,90 @@
           <div class="menu-entry" data-action="help-shortcuts">Keyboard Shortcuts</div>
         </div>
       </div>
-      <div id="menubar-title">RetroSim PCB v1.0</div>
+      <div id="menubar-title">RetroSim v2.0 — KiCad Viewer</div>
     </div>
 
     <!-- Toolbar -->
     <div id="toolbar">
-      <button class="tool-btn" data-tool="select" title="Select (V)">&#9754;</button>
-      <button class="tool-btn" data-tool="move" title="Move (M)">&#9995;</button>
+      <button class="tool-btn open-btn" data-action="open" title="Open KiCad Schematic">&#128194;</button>
       <div class="tool-sep"></div>
-      <button class="tool-btn" data-tool="wire" title="Wire (W)">&#9866;</button>
-      <button class="tool-btn" data-tool="bus" title="Bus (B)">&#9776;</button>
+      <button class="tool-btn" data-action="zoom-in" title="Zoom In">&#128269;</button>
+      <button class="tool-btn" data-action="zoom-out" title="Zoom Out">&#8722;</button>
+      <button class="tool-btn" data-action="zoom-fit" title="Fit to Window">&#9634;</button>
       <div class="tool-sep"></div>
-      <button class="tool-btn" data-tool="probe" title="Probe (P)">&#9889;</button>
-      <button class="tool-btn" data-tool="label" title="Net Label (L)">&#9047;</button>
+      <button class="tool-btn" data-action="toggle-grid" title="Toggle Grid">&#9783;</button>
+      <button class="tool-btn" data-action="toggle-labels" title="Toggle Labels">&#9047;</button>
       <div class="tool-sep"></div>
-      <button class="tool-btn sim-btn" data-action="sim-start" title="Run Simulation">&#9654;</button>
-      <button class="tool-btn sim-btn" data-action="sim-step" title="Step">&#9199;</button>
-      <button class="tool-btn sim-btn" data-action="sim-stop" title="Stop">&#9632;</button>
-      <button class="tool-btn sim-btn" data-action="sim-reset" title="Reset">&#8634;</button>
-      <div class="tool-sep"></div>
-      <span id="sim-status" class="status-indicator off">SIM: OFF</span>
-      <span id="sim-cycle">Cycle: 0</span>
-      <span id="sim-freq">0 Hz</span>
+      <button class="tool-btn" data-action="export" title="Export PNG">&#128247;</button>
+      <div style="flex:1"></div>
+      <span id="file-name" class="toolbar-info">No file loaded</span>
     </div>
 
     <!-- Main Workspace -->
     <div id="workspace">
-      <!-- Component Library Panel -->
+      <!-- Component List Panel -->
       <div id="library-panel" class="win95-panel">
         <div class="panel-title">Components</div>
         <div id="library-search">
-          <input type="text" placeholder="Search..." id="lib-search-input">
+          <input type="text" placeholder="Filter..." id="lib-search-input">
         </div>
-        <div id="library-tree"></div>
+        <div id="library-tree">
+          <p class="hint-text">Open a schematic to see components</p>
+        </div>
       </div>
 
       <!-- Schematic Canvas -->
       <div id="canvas-container">
         <canvas id="schematic-canvas"></canvas>
         <div id="canvas-coords">X: 0  Y: 0</div>
+        <!-- Drop zone overlay -->
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-content">
+            <div class="drop-icon">&#128194;</div>
+            <div class="drop-text">Drop .kicad_sch file here</div>
+            <div class="drop-hint">or use File > Open</div>
+            <button class="win95-btn open-file-btn" id="open-file-btn">Open File...</button>
+            <div class="drop-demos">
+              <span>or try a demo:</span>
+              <button class="win95-btn small" data-action="demo-reset">Reset Circuit</button>
+              <button class="win95-btn small" data-action="demo-cpu">i486 Block</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Right Panel (tabbed) -->
+      <!-- Right Panel -->
       <div id="right-panel" class="win95-panel">
         <div class="panel-tabs">
           <button class="panel-tab active" data-tab="properties">Properties</button>
-          <button class="panel-tab" data-tab="boards">Boards</button>
+          <button class="panel-tab" data-tab="info">Info</button>
         </div>
         <div id="properties-tab" class="tab-content active">
           <div id="properties-content">
-            <p class="hint-text">Select a component to view properties</p>
+            <p class="hint-text">Tap a component to view properties</p>
           </div>
         </div>
-        <div id="boards-tab" class="tab-content">
-          <div id="boards-content">
-            <div class="board-list">
-              <div class="board-entry active" data-board="main">
-                <span class="board-icon">&#9638;</span> Main Board
-              </div>
-            </div>
-            <div class="board-actions">
-              <button class="win95-btn small" id="add-board-btn">+ Add Board</button>
+        <div id="info-tab" class="tab-content">
+          <div id="info-content">
+            <div class="prop-group">
+              <div class="prop-group-title">Schematic</div>
+              <div class="prop-row"><span class="prop-label">File:</span><span class="prop-value" id="info-file">-</span></div>
+              <div class="prop-row"><span class="prop-label">Paper:</span><span class="prop-value" id="info-paper">-</span></div>
+              <div class="prop-row"><span class="prop-label">Components:</span><span class="prop-value" id="info-comps">-</span></div>
+              <div class="prop-row"><span class="prop-label">Wires:</span><span class="prop-value" id="info-wires">-</span></div>
+              <div class="prop-row"><span class="prop-label">Nets:</span><span class="prop-value" id="info-nets">-</span></div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Bottom Panel (Waveform / Console) -->
+    <!-- Bottom Panel (Console) -->
     <div id="bottom-panel">
       <div class="panel-tabs">
-        <button class="panel-tab active" data-tab="waveform">Waveform</button>
-        <button class="panel-tab" data-tab="console">Console</button>
+        <button class="panel-tab active" data-tab="console">Console</button>
       </div>
-      <div id="waveform-tab" class="tab-content active">
-        <div id="waveform-toolbar">
-          <button class="win95-btn small" id="wave-zoom-in">+</button>
-          <button class="win95-btn small" id="wave-zoom-out">-</button>
-          <button class="win95-btn small" id="wave-fit">Fit</button>
-          <span id="wave-time">Time: 0ns</span>
-        </div>
-        <div id="waveform-container">
-          <canvas id="waveform-canvas"></canvas>
-        </div>
-      </div>
-      <div id="console-tab" class="tab-content">
+      <div id="console-tab" class="tab-content active">
         <div id="console-output"></div>
       </div>
       <div id="bottom-resize-handle"></div>
@@ -177,16 +149,17 @@
   <!-- About Dialog -->
   <div id="about-dialog" class="win95-dialog" style="display:none;">
     <div class="dialog-titlebar">
-      <span>About RetroSim PCB</span>
+      <span>About RetroSim</span>
       <button class="dialog-close">&times;</button>
     </div>
     <div class="dialog-body">
       <div class="about-icon">&#9881;</div>
-      <h2>RetroSim PCB</h2>
-      <p>Digital Circuit & PCB Simulator</p>
-      <p>Version 1.0</p>
+      <h2>RetroSim</h2>
+      <p>KiCad Schematic Viewer</p>
+      <p>Version 2.0</p>
       <hr>
-      <p>A retro-styled digital circuit simulator for designing and testing complex multi-board PCB systems.</p>
+      <p>View KiCad .kicad_sch schematics in your browser.</p>
+      <p>Design in KiCad, view anywhere.</p>
       <p>Built for the Homemade i486 Computer project.</p>
       <br>
       <button class="win95-btn" onclick="document.getElementById('about-dialog').style.display='none'">OK</button>
@@ -201,29 +174,26 @@
     </div>
     <div class="dialog-body shortcuts-body">
       <table>
-        <tr><td><kbd>V</kbd></td><td>Select tool</td></tr>
-        <tr><td><kbd>M</kbd></td><td>Move tool</td></tr>
-        <tr><td><kbd>W</kbd></td><td>Wire tool</td></tr>
-        <tr><td><kbd>B</kbd></td><td>Bus tool</td></tr>
-        <tr><td><kbd>P</kbd></td><td>Probe tool</td></tr>
-        <tr><td><kbd>L</kbd></td><td>Net label tool</td></tr>
-        <tr><td><kbd>Del</kbd></td><td>Delete selection</td></tr>
-        <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
-        <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo</td></tr>
-        <tr><td><kbd>Space</kbd></td><td>Run/Stop simulation</td></tr>
-        <tr><td><kbd>.</kbd></td><td>Step simulation</td></tr>
-        <tr><td><kbd>Scroll</kbd></td><td>Zoom in/out</td></tr>
+        <tr><td><kbd>Ctrl+O</kbd></td><td>Open schematic file</td></tr>
+        <tr><td><kbd>F</kbd></td><td>Fit to window</td></tr>
+        <tr><td><kbd>G</kbd></td><td>Toggle grid</td></tr>
+        <tr><td><kbd>+/-</kbd></td><td>Zoom in/out</td></tr>
+        <tr><td><kbd>Scroll</kbd></td><td>Zoom</td></tr>
+        <tr><td><kbd>Shift+Drag</kbd></td><td>Pan canvas</td></tr>
         <tr><td><kbd>Middle drag</kbd></td><td>Pan canvas</td></tr>
-        <tr><td><kbd>R</kbd></td><td>Rotate component</td></tr>
+        <tr><td>Pinch</td><td>Zoom (touch)</td></tr>
+        <tr><td>Drag</td><td>Pan (touch)</td></tr>
+        <tr><td>Tap</td><td>Select component (touch)</td></tr>
       </table>
       <br>
       <button class="win95-btn" onclick="document.getElementById('shortcuts-dialog').style.display='none'">OK</button>
     </div>
   </div>
 
-  <script src="js/components.js"></script>
-  <script src="js/simulation.js"></script>
-  <script src="js/waveform.js"></script>
+  <!-- Hidden file input -->
+  <input type="file" id="file-input" accept=".kicad_sch" style="display:none">
+
+  <script src="js/kicad-parser.js"></script>
   <script src="js/schematic.js"></script>
   <script src="js/main.js"></script>
 </body>

@@ -1,963 +1,643 @@
-class SchematicEditor {
+class SchematicViewer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.components = [];
-    this.wires = [];
-    this.tool = 'select';
-    this.zoom = 1;
+    this.sch = null;
+    this.zoom = 3;
     this.panX = 0;
     this.panY = 0;
-    this.gridSize = 10;
+    this.selected = null;
     this.showGrid = true;
     this.showLabels = true;
-    this.selected = null;
-    this.selectedWire = null;
     this.dragging = false;
-    this.dragStart = null;
-    this.dragOffset = null;
-    this.wireStart = null;
-    this.wirePreview = null;
-    this.isPanning = false;
-    this.panStart = null;
-    this.hoveredPin = null;
-    this.tooltip = null;
-
+    this.lastPt = null;
+    this.pinchDist = 0;
     this.onSelectionChange = null;
     this.onStatusMessage = null;
     this.onComponentsChange = null;
-
-    this.undoStack = [];
-    this.redoStack = [];
-
+    this.setupMouse();
+    this.setupTouch();
     this.resize();
-    this.setupEvents();
     window.addEventListener('resize', () => this.resize());
   }
 
   resize() {
-    const container = this.canvas.parentElement;
-    this.canvas.width = container.clientWidth;
-    this.canvas.height = container.clientHeight;
+    const c = this.canvas.parentElement;
+    if (!c) return;
+    this.canvas.width = c.clientWidth;
+    this.canvas.height = c.clientHeight;
     this.draw();
   }
 
-  setupEvents() {
-    this.canvas.addEventListener('mousedown', e => this.onMouseDown(e));
-    this.canvas.addEventListener('mousemove', e => this.onMouseMove(e));
-    this.canvas.addEventListener('mouseup', e => this.onMouseUp(e));
-    this.canvas.addEventListener('wheel', e => this.onWheel(e));
-    this.canvas.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      this.showContextMenu(e);
-    });
-    this.canvas.addEventListener('dblclick', e => this.onDoubleClick(e));
-  }
-
-  screenToWorld(sx, sy) {
-    return {
-      x: (sx - this.panX) / this.zoom,
-      y: (sy - this.panY) / this.zoom
-    };
-  }
-
-  worldToScreen(wx, wy) {
-    return {
-      x: wx * this.zoom + this.panX,
-      y: wy * this.zoom + this.panY
-    };
-  }
-
-  snapToGrid(v) {
-    return Math.round(v / this.gridSize) * this.gridSize;
-  }
-
-  saveState() {
-    this.undoStack.push({
-      components: JSON.stringify(this.components.map(c => ({
-        defId: c.def.id, x: c.x, y: c.y, id: c.id,
-        rotation: c.rotation, label: c.label, properties: { ...c.properties }
-      }))),
-      wires: JSON.stringify(this.wires.map(w => ({
-        id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2
-      })))
-    });
-    if (this.undoStack.length > 50) this.undoStack.shift();
-    this.redoStack = [];
-  }
-
-  undo() {
-    if (this.undoStack.length === 0) return;
-    this.redoStack.push({
-      components: JSON.stringify(this.components.map(c => ({
-        defId: c.def.id, x: c.x, y: c.y, id: c.id,
-        rotation: c.rotation, label: c.label, properties: { ...c.properties }
-      }))),
-      wires: JSON.stringify(this.wires.map(w => ({
-        id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2
-      })))
-    });
-    const state = this.undoStack.pop();
-    this.restoreState(state);
-  }
-
-  redo() {
-    if (this.redoStack.length === 0) return;
-    this.undoStack.push({
-      components: JSON.stringify(this.components.map(c => ({
-        defId: c.def.id, x: c.x, y: c.y, id: c.id,
-        rotation: c.rotation, label: c.label, properties: { ...c.properties }
-      }))),
-      wires: JSON.stringify(this.wires.map(w => ({
-        id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2
-      })))
-    });
-    const state = this.redoStack.pop();
-    this.restoreState(state);
-  }
-
-  restoreState(state) {
-    const comps = JSON.parse(state.components);
-    this.components = comps.map(c => {
-      const def = COMPONENT_LIBRARY[c.defId];
-      if (!def) return null;
-      const inst = new ComponentInstance(def, c.x, c.y);
-      inst.id = c.id;
-      inst.rotation = c.rotation;
-      inst.label = c.label;
-      inst.properties = c.properties || {};
-      return inst;
-    }).filter(Boolean);
-
-    const wires = JSON.parse(state.wires);
-    this.wires = wires.map(w => {
-      const wire = new Wire(w.x1, w.y1, w.x2, w.y2);
-      wire.id = w.id;
-      return wire;
-    });
-
+  loadSchematic(sch) {
+    this.sch = sch;
     this.selected = null;
-    this.selectedWire = null;
+    this.zoomToFit();
     this.draw();
     if (this.onComponentsChange) this.onComponentsChange();
+    if (this.onStatusMessage) this.onStatusMessage('Schematic loaded: ' + sch.symbols.length + ' components, ' + sch.wires.length + ' wires');
   }
 
-  addComponent(defId, x, y) {
-    const def = COMPONENT_LIBRARY[defId];
-    if (!def) return null;
+  get components() { return this.sch ? this.sch.symbols : []; }
+  get wires() { return this.sch ? this.sch.wires : []; }
 
-    this.saveState();
-    const inst = new ComponentInstance(def, this.snapToGrid(x), this.snapToGrid(y));
-    this.components.push(inst);
-    this.draw();
-    if (this.onComponentsChange) this.onComponentsChange();
-    if (this.onStatusMessage) this.onStatusMessage('Placed: ' + def.name);
-    return inst;
+  mmToScreen(x, y) {
+    return { x: x * this.zoom + this.panX, y: y * this.zoom + this.panY };
   }
 
-  deleteSelected() {
-    if (this.selected) {
-      this.saveState();
-      this.components = this.components.filter(c => c !== this.selected);
-      this.selected = null;
-      if (this.onSelectionChange) this.onSelectionChange(null);
-      if (this.onComponentsChange) this.onComponentsChange();
-      this.draw();
-    } else if (this.selectedWire) {
-      this.saveState();
-      this.wires = this.wires.filter(w => w !== this.selectedWire);
-      this.selectedWire = null;
-      if (this.onComponentsChange) this.onComponentsChange();
-      this.draw();
-    }
+  screenToMm(sx, sy) {
+    return { x: (sx - this.panX) / this.zoom, y: (sy - this.panY) / this.zoom };
   }
 
-  findComponentAt(wx, wy) {
-    for (let i = this.components.length - 1; i >= 0; i--) {
-      const c = this.components[i];
-      const b = c.getBounds();
-      if (wx >= b.x && wx <= b.x + b.width && wy >= b.y && wy <= b.y + b.height) {
-        return c;
-      }
-    }
-    return null;
+  transformPt(lx, ly, inst) {
+    let x = lx, y = ly;
+    if (inst.mirrorX) x = -x;
+    if (inst.mirrorY) y = -y;
+    const rad = -inst.at.angle * Math.PI / 180;
+    const rx = x * Math.cos(rad) - y * Math.sin(rad);
+    const ry = x * Math.sin(rad) + y * Math.cos(rad);
+    return { x: inst.at.x + rx, y: inst.at.y + ry };
   }
 
-  findPinAt(wx, wy, threshold = 10) {
-    for (const comp of this.components) {
-      for (const pinDef of comp.def.pins) {
-        const pos = comp.getPinPosition(pinDef.name);
-        if (pos && Math.abs(pos.x - wx) < threshold && Math.abs(pos.y - wy) < threshold) {
-          return { component: comp, pinDef, pos };
-        }
-      }
-    }
-    return null;
-  }
-
-  findWireAt(wx, wy, threshold = 6) {
-    for (const w of this.wires) {
-      const dx = w.x2 - w.x1;
-      const dy = w.y2 - w.y1;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len === 0) continue;
-
-      const t = Math.max(0, Math.min(1, ((wx - w.x1) * dx + (wy - w.y1) * dy) / (len * len)));
-      const px = w.x1 + t * dx;
-      const py = w.y1 + t * dy;
-      const dist = Math.sqrt((wx - px) ** 2 + (wy - py) ** 2);
-
-      if (dist < threshold) return w;
-    }
-    return null;
-  }
-
-  onMouseDown(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-
-    // Middle button = pan
-    if (e.button === 1) {
-      this.isPanning = true;
-      this.panStart = { x: e.clientX, y: e.clientY, px: this.panX, py: this.panY };
+  setupMouse() {
+    const c = this.canvas;
+    c.addEventListener('wheel', e => {
       e.preventDefault();
-      return;
-    }
+      const rect = c.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const newZoom = Math.max(0.3, Math.min(30, this.zoom * factor));
+      this.panX = mx - (mx - this.panX) * (newZoom / this.zoom);
+      this.panY = my - (my - this.panY) * (newZoom / this.zoom);
+      this.zoom = newZoom;
+      this.updateZoomDisplay();
+      this.draw();
+    }, { passive: false });
 
-    if (e.button !== 0) return;
-
-    if (this.tool === 'select' || this.tool === 'move') {
-      const comp = this.findComponentAt(wx, wy);
-      if (comp) {
-        if (this.selected) this.selected.selected = false;
-        if (this.selectedWire) this.selectedWire.selected = false;
-        this.selectedWire = null;
-
-        comp.selected = true;
-        this.selected = comp;
+    c.addEventListener('mousedown', e => {
+      if (e.button === 1 || e.button === 2 || (e.button === 0 && e.shiftKey)) {
         this.dragging = true;
-        this.dragOffset = { x: wx - comp.x, y: wy - comp.y };
-        if (this.onSelectionChange) this.onSelectionChange(comp);
-
-        // Toggle switch on click
-        if (comp.def.id === 'switch') {
-          comp.properties.state = comp.properties.state === '1' ? '0' : '1';
-          if (this.onSelectionChange) this.onSelectionChange(comp);
-        }
-        if (comp.def.id === 'button') {
-          comp.properties.pressed = '1';
-        }
-      } else {
-        const wire = this.findWireAt(wx, wy);
-        if (wire) {
-          if (this.selected) this.selected.selected = false;
-          if (this.selectedWire) this.selectedWire.selected = false;
-          this.selected = null;
-          wire.selected = true;
-          this.selectedWire = wire;
-          if (this.onSelectionChange) this.onSelectionChange(null);
-        } else {
-          if (this.selected) this.selected.selected = false;
-          if (this.selectedWire) this.selectedWire.selected = false;
-          this.selected = null;
-          this.selectedWire = null;
-          if (this.onSelectionChange) this.onSelectionChange(null);
-
-          // Start pan on empty space
-          this.isPanning = true;
-          this.panStart = { x: e.clientX, y: e.clientY, px: this.panX, py: this.panY };
-        }
+        this.lastPt = { x: e.clientX, y: e.clientY };
+        e.preventDefault();
+      } else if (e.button === 0) {
+        const rect = c.getBoundingClientRect();
+        const mm = this.screenToMm(e.clientX - rect.left, e.clientY - rect.top);
+        this.selectAt(mm.x, mm.y);
       }
-    } else if (this.tool === 'wire') {
-      const snappedX = this.snapToGrid(wx);
-      const snappedY = this.snapToGrid(wy);
+    });
 
-      const pin = this.findPinAt(wx, wy);
-      const startX = pin ? pin.pos.x : snappedX;
-      const startY = pin ? pin.pos.y : snappedY;
-
-      if (!this.wireStart) {
-        this.wireStart = { x: startX, y: startY };
-      } else {
-        this.saveState();
-        // Manhattan routing: create two wire segments
-        const sx = this.wireStart.x;
-        const sy = this.wireStart.y;
-        const ex = startX;
-        const ey = startY;
-
-        if (sx !== ex || sy !== ey) {
-          if (Math.abs(ex - sx) > Math.abs(ey - sy)) {
-            // Horizontal first
-            this.wires.push(new Wire(sx, sy, ex, sy));
-            if (sy !== ey) this.wires.push(new Wire(ex, sy, ex, ey));
-          } else {
-            // Vertical first
-            this.wires.push(new Wire(sx, sy, sx, ey));
-            if (sx !== ex) this.wires.push(new Wire(sx, ey, ex, ey));
-          }
-        }
-        this.wireStart = { x: ex, y: ey };
-        if (this.onComponentsChange) this.onComponentsChange();
+    c.addEventListener('mousemove', e => {
+      if (this.dragging && this.lastPt) {
+        this.panX += e.clientX - this.lastPt.x;
+        this.panY += e.clientY - this.lastPt.y;
+        this.lastPt = { x: e.clientX, y: e.clientY };
+        this.draw();
       }
-    } else if (this.tool === 'probe') {
-      const pin = this.findPinAt(wx, wy);
-      if (pin) {
-        const probe = this.addComponent('probe_point', pin.pos.x - 30, pin.pos.y - 15);
-        if (probe) {
-          probe.label = pin.pinDef.name + '@' + pin.component.label;
-          this.wires.push(new Wire(pin.pos.x, pin.pos.y, probe.x + 30, probe.y + 15));
-        }
-      }
-    }
+      const rect = c.getBoundingClientRect();
+      const mm = this.screenToMm(e.clientX - rect.left, e.clientY - rect.top);
+      const coords = document.getElementById('canvas-coords');
+      if (coords) coords.textContent = `X: ${mm.x.toFixed(1)}  Y: ${mm.y.toFixed(1)}`;
+    });
 
-    this.draw();
+    window.addEventListener('mouseup', () => { this.dragging = false; this.lastPt = null; });
+    c.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  onMouseMove(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+  setupTouch() {
+    const c = this.canvas;
+    let lastTouch = null;
+    let lastPinch = 0;
+    let touchTimer = null;
 
-    // Update coords display
-    const coordsEl = document.getElementById('canvas-coords');
-    if (coordsEl) {
-      coordsEl.textContent = `X: ${Math.round(wx)}  Y: ${Math.round(wy)}`;
-    }
-
-    if (this.isPanning) {
-      this.panX = this.panStart.px + (e.clientX - this.panStart.x);
-      this.panY = this.panStart.py + (e.clientY - this.panStart.y);
-      this.draw();
-      return;
-    }
-
-    if (this.dragging && this.selected) {
-      this.selected.x = this.snapToGrid(wx - this.dragOffset.x);
-      this.selected.y = this.snapToGrid(wy - this.dragOffset.y);
-      this.draw();
-      return;
-    }
-
-    if (this.tool === 'wire' && this.wireStart) {
-      const pin = this.findPinAt(wx, wy);
-      this.wirePreview = {
-        x: pin ? pin.pos.x : this.snapToGrid(wx),
-        y: pin ? pin.pos.y : this.snapToGrid(wy)
-      };
-      this.draw();
-      return;
-    }
-
-    // Hover detection for pin highlights
-    const pin = this.findPinAt(wx, wy);
-    this.hoveredPin = pin;
-    this.draw();
-  }
-
-  onMouseUp(e) {
-    if (e.button === 1) {
-      this.isPanning = false;
-      return;
-    }
-
-    if (this.dragging && this.selected) {
-      this.dragging = false;
-      this.saveState();
-    }
-
-    if (e.button === 0) {
-      // Release button
-      for (const comp of this.components) {
-        if (comp.def.id === 'button') {
-          comp.properties.pressed = '0';
-        }
+    c.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        touchTimer = setTimeout(() => { touchTimer = null; }, 200);
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        lastPinch = Math.sqrt(dx * dx + dy * dy);
+        lastTouch = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        };
       }
-    }
+    }, { passive: false });
 
-    this.isPanning = false;
-  }
+    c.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+      if (e.touches.length === 1 && lastTouch) {
+        this.panX += e.touches[0].clientX - lastTouch.x;
+        this.panY += e.touches[0].clientY - lastTouch.y;
+        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        this.draw();
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const rect = c.getBoundingClientRect();
+        const mx = cx - rect.left, my = cy - rect.top;
+        if (lastPinch > 0) {
+          const factor = dist / lastPinch;
+          const newZoom = Math.max(0.3, Math.min(30, this.zoom * factor));
+          this.panX = mx - (mx - this.panX) * (newZoom / this.zoom);
+          this.panY = my - (my - this.panY) * (newZoom / this.zoom);
+          this.zoom = newZoom;
+          this.updateZoomDisplay();
+        }
+        if (lastTouch) {
+          this.panX += cx - lastTouch.x;
+          this.panY += cy - lastTouch.y;
+        }
+        lastPinch = dist;
+        lastTouch = { x: cx, y: cy };
+        this.draw();
+      }
+    }, { passive: false });
 
-  onWheel(e) {
-    e.preventDefault();
-    const rect = this.canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
-    const oldZoom = this.zoom;
-    if (e.deltaY < 0) {
-      this.zoom = Math.min(4, this.zoom * 1.1);
-    } else {
-      this.zoom = Math.max(0.2, this.zoom / 1.1);
-    }
-
-    // Zoom toward cursor
-    this.panX = mx - (mx - this.panX) * (this.zoom / oldZoom);
-    this.panY = my - (my - this.panY) * (this.zoom / oldZoom);
-
-    this.draw();
-    this.updateZoomDisplay();
+    c.addEventListener('touchend', e => {
+      if (e.touches.length === 0) {
+        if (touchTimer && lastTouch) {
+          clearTimeout(touchTimer);
+          const rect = c.getBoundingClientRect();
+          const mm = this.screenToMm(lastTouch.x - rect.left, lastTouch.y - rect.top);
+          this.selectAt(mm.x, mm.y);
+        }
+        lastTouch = null;
+        lastPinch = 0;
+        touchTimer = null;
+      }
+    });
   }
 
   updateZoomDisplay() {
     const el = document.getElementById('status-zoom');
-    if (el) el.textContent = Math.round(this.zoom * 100) + '%';
+    if (el) el.textContent = Math.round(this.zoom * 33) + '%';
   }
 
-  onDoubleClick(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-
-    const comp = this.findComponentAt(wx, wy);
-    if (comp) {
-      const newLabel = prompt('Component label:', comp.label);
-      if (newLabel !== null) {
-        this.saveState();
-        comp.label = newLabel;
-        this.draw();
-        if (this.onSelectionChange) this.onSelectionChange(comp);
-      }
+  selectAt(wx, wy) {
+    if (!this.sch) return;
+    let best = null, bestDist = 20;
+    for (const inst of this.sch.symbols) {
+      const dx = wx - inst.at.x, dy = wy - inst.at.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) { bestDist = d; best = inst; }
     }
-  }
-
-  showContextMenu(e) {
-    const existing = document.querySelector('.context-menu');
-    if (existing) existing.remove();
-
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-
-    const comp = this.findComponentAt(wx, wy);
-    const wire = this.findWireAt(wx, wy);
-
-    const menu = document.createElement('div');
-    menu.className = 'context-menu';
-    menu.style.left = e.clientX + 'px';
-    menu.style.top = e.clientY + 'px';
-
-    const addEntry = (label, fn) => {
-      const entry = document.createElement('div');
-      entry.className = 'ctx-entry';
-      entry.textContent = label;
-      entry.addEventListener('click', () => { fn(); menu.remove(); });
-      menu.appendChild(entry);
-    };
-
-    const addSep = () => {
-      const sep = document.createElement('div');
-      sep.className = 'ctx-separator';
-      menu.appendChild(sep);
-    };
-
-    if (comp) {
-      addEntry('Rename: ' + comp.label, () => {
-        const newLabel = prompt('Label:', comp.label);
-        if (newLabel !== null) { this.saveState(); comp.label = newLabel; this.draw(); }
-      });
-      addEntry('Rotate 90°', () => {
-        this.saveState();
-        comp.rotation = (comp.rotation + 90) % 360;
-        this.draw();
-      });
-      addSep();
-      addEntry('Delete', () => {
-        this.saveState();
-        this.components = this.components.filter(c => c !== comp);
-        if (this.selected === comp) this.selected = null;
-        this.draw();
-        if (this.onComponentsChange) this.onComponentsChange();
-      });
-    } else if (wire) {
-      addEntry('Delete Wire', () => {
-        this.saveState();
-        this.wires = this.wires.filter(w => w !== wire);
-        this.draw();
-        if (this.onComponentsChange) this.onComponentsChange();
-      });
-    } else {
-      addEntry('Paste', () => {});
-      addSep();
-      addEntry('Zoom to Fit', () => this.zoomToFit());
-    }
-
-    document.body.appendChild(menu);
-    const closeMenu = () => { menu.remove(); document.removeEventListener('click', closeMenu); };
-    setTimeout(() => document.addEventListener('click', closeMenu), 10);
-  }
-
-  setTool(tool) {
-    this.tool = tool;
-    this.wireStart = null;
-    this.wirePreview = null;
-    this.canvas.style.cursor = {
-      select: 'default',
-      move: 'grab',
-      wire: 'crosshair',
-      bus: 'crosshair',
-      probe: 'crosshair',
-      label: 'text'
-    }[tool] || 'default';
+    this.selected = best;
     this.draw();
+    if (this.onSelectionChange) this.onSelectionChange(best);
   }
 
   zoomToFit() {
-    if (this.components.length === 0) return;
+    if (!this.sch) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const c of this.components) {
-      const b = c.getBounds();
-      minX = Math.min(minX, b.x);
-      minY = Math.min(minY, b.y);
-      maxX = Math.max(maxX, b.x + b.width);
-      maxY = Math.max(maxY, b.y + b.height);
+    const expand = (x, y) => {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    };
+    for (const w of this.sch.wires) { expand(w.start.x, w.start.y); expand(w.end.x, w.end.y); }
+    for (const s of this.sch.symbols) { expand(s.at.x - 10, s.at.y - 10); expand(s.at.x + 10, s.at.y + 10); }
+    for (const j of this.sch.junctions) expand(j.at.x, j.at.y);
+    for (const l of this.sch.labels) expand(l.at.x, l.at.y);
+    for (const l of this.sch.globalLabels) expand(l.at.x, l.at.y);
+    if (!isFinite(minX)) {
+      const ps = KicadParser.getPageSize(this.sch.paper);
+      minX = 0; minY = 0; maxX = ps[0]; maxY = ps[1];
     }
-    const margin = 50;
-    const w = maxX - minX + margin * 2;
-    const h = maxY - minY + margin * 2;
-    this.zoom = Math.min(this.canvas.width / w, this.canvas.height / h);
-    this.zoom = Math.max(0.2, Math.min(4, this.zoom));
-    this.panX = this.canvas.width / 2 - (minX + maxX) / 2 * this.zoom;
-    this.panY = this.canvas.height / 2 - (minY + maxY) / 2 * this.zoom;
+    const pad = 15;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const w = maxX - minX, h = maxY - minY;
+    const cw = this.canvas.width, ch = this.canvas.height;
+    this.zoom = Math.min(cw / w, ch / h);
+    this.panX = (cw - w * this.zoom) / 2 - minX * this.zoom;
+    this.panY = (ch - h * this.zoom) / 2 - minY * this.zoom;
     this.updateZoomDisplay();
-    this.draw();
   }
-
-  // ========== RENDERING ==========
 
   draw() {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-
-    // Background
+    const w = this.canvas.width, h = this.canvas.height;
     ctx.fillStyle = '#F5F0E8';
     ctx.fillRect(0, 0, w, h);
-
-    ctx.save();
-    ctx.translate(this.panX, this.panY);
-    ctx.scale(this.zoom, this.zoom);
-
-    // Grid
+    if (!this.sch) { this.drawEmpty(); return; }
     if (this.showGrid) this.drawGrid();
-
-    // Wires
-    for (const wire of this.wires) {
-      this.drawWire(wire);
-    }
-
-    // Wire preview
-    if (this.wireStart && this.wirePreview) {
-      this.drawWirePreview();
-    }
-
-    // Components
-    for (const comp of this.components) {
-      this.drawComponent(comp);
-    }
-
-    // Hovered pin highlight
-    if (this.hoveredPin) {
-      ctx.beginPath();
-      ctx.arc(this.hoveredPin.pos.x, this.hoveredPin.pos.y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 200, 0, 0.4)';
-      ctx.fill();
-      ctx.strokeStyle = '#FF8800';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-
-    // Junction dots (where wires meet)
+    this.drawWires();
+    this.drawBuses();
     this.drawJunctions();
+    this.drawNoConnects();
+    for (const inst of this.sch.symbols) this.drawSymbol(inst);
+    this.drawLabels();
+    this.drawGlobalLabels();
+    this.drawHierLabels();
+    this.drawTextItems();
+    this.drawSheets();
+    if (this.selected) this.drawSelection();
+  }
 
-    ctx.restore();
+  drawEmpty() {
+    const ctx = this.ctx;
+    const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+    ctx.fillStyle = '#808080';
+    ctx.font = '16px "VT323", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Open a KiCad schematic (.kicad_sch) to view it', cx, cy - 20);
+    ctx.font = '13px "VT323", monospace';
+    ctx.fillStyle = '#A0A0A0';
+    ctx.fillText('File > Open  or  drag & drop  or  tap Open button', cx, cy + 10);
+    ctx.fillText('Pinch to zoom  |  Drag to pan  |  Tap to select', cx, cy + 30);
   }
 
   drawGrid() {
     const ctx = this.ctx;
-    const gridSize = this.gridSize;
-    const viewLeft = -this.panX / this.zoom;
-    const viewTop = -this.panY / this.zoom;
-    const viewRight = (this.canvas.width - this.panX) / this.zoom;
-    const viewBottom = (this.canvas.height - this.panY) / this.zoom;
-
-    ctx.fillStyle = '#D0CBB8';
-    const startX = Math.floor(viewLeft / gridSize) * gridSize;
-    const startY = Math.floor(viewTop / gridSize) * gridSize;
-
-    for (let x = startX; x <= viewRight; x += gridSize) {
-      for (let y = startY; y <= viewBottom; y += gridSize) {
-        ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    const step = 2.54;
+    const s0 = this.mmToScreen(0, 0);
+    const s1 = this.mmToScreen(step, step);
+    const gap = s1.x - s0.x;
+    if (gap < 6) return;
+    const minMm = this.screenToMm(0, 0);
+    const maxMm = this.screenToMm(this.canvas.width, this.canvas.height);
+    const startX = Math.floor(minMm.x / step) * step;
+    const startY = Math.floor(minMm.y / step) * step;
+    ctx.fillStyle = '#D8D4CC';
+    for (let x = startX; x <= maxMm.x; x += step) {
+      for (let y = startY; y <= maxMm.y; y += step) {
+        const s = this.mmToScreen(x, y);
+        ctx.fillRect(s.x, s.y, 1, 1);
       }
     }
   }
 
-  drawWire(wire) {
+  drawWires() {
     const ctx = this.ctx;
-    ctx.beginPath();
-    ctx.moveTo(wire.x1, wire.y1);
-    ctx.lineTo(wire.x2, wire.y2);
-
-    if (wire.selected) {
-      ctx.strokeStyle = '#0000FF';
-      ctx.lineWidth = 3;
-    } else {
-      switch (wire.signal) {
-        case SIGNAL.HIGH: ctx.strokeStyle = '#DD2222'; break;
-        case SIGNAL.LOW: ctx.strokeStyle = '#2244AA'; break;
-        case SIGNAL.Z: ctx.strokeStyle = '#888888'; break;
-        case SIGNAL.UNKNOWN: ctx.strokeStyle = '#FF8800'; break;
-        default: ctx.strokeStyle = '#446644';
-      }
-      ctx.lineWidth = 2;
+    ctx.strokeStyle = '#006600';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.25);
+    ctx.lineCap = 'round';
+    for (const w of this.sch.wires) {
+      const a = this.mmToScreen(w.start.x, w.start.y);
+      const b = this.mmToScreen(w.end.x, w.end.y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
-    ctx.stroke();
   }
 
-  drawWirePreview() {
+  drawBuses() {
     const ctx = this.ctx;
-    const sx = this.wireStart.x;
-    const sy = this.wireStart.y;
-    const ex = this.wirePreview.x;
-    const ey = this.wirePreview.y;
-
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#00AA00';
-    ctx.lineWidth = 1.5;
-
-    if (Math.abs(ex - sx) > Math.abs(ey - sy)) {
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(ex, sy);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx, ey);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
+    ctx.strokeStyle = '#000080';
+    ctx.lineWidth = Math.max(2, this.zoom * 0.5);
+    ctx.lineCap = 'round';
+    for (const b of this.sch.buses) {
+      const a = this.mmToScreen(b.start.x, b.start.y);
+      const e = this.mmToScreen(b.end.x, b.end.y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(e.x, e.y); ctx.stroke();
     }
-    ctx.setLineDash([]);
   }
 
   drawJunctions() {
     const ctx = this.ctx;
-    const points = {};
-
-    for (const w of this.wires) {
-      const k1 = `${w.x1},${w.y1}`;
-      const k2 = `${w.x2},${w.y2}`;
-      points[k1] = (points[k1] || 0) + 1;
-      points[k2] = (points[k2] || 0) + 1;
-    }
-
-    for (const key in points) {
-      if (points[key] >= 3) {
-        const [x, y] = key.split(',').map(Number);
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#2244AA';
-        ctx.fill();
-      }
+    ctx.fillStyle = '#006600';
+    const r = Math.max(2, this.zoom * 0.6);
+    for (const j of this.sch.junctions) {
+      const s = this.mmToScreen(j.at.x, j.at.y);
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  drawComponent(comp) {
+  drawNoConnects() {
     const ctx = this.ctx;
-    const def = comp.def;
-    const x = comp.x;
-    const y = comp.y;
-    const w = def.width;
-    const h = def.height;
-
-    ctx.save();
-
-    if (comp.rotation !== 0) {
-      ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate((comp.rotation * Math.PI) / 180);
-      ctx.translate(-(x + w / 2), -(y + h / 2));
-    }
-
-    // Body
-    ctx.fillStyle = def.color;
-    ctx.strokeStyle = comp.selected ? '#0000FF' : '#000000';
-    ctx.lineWidth = comp.selected ? 2.5 : 1.5;
-    ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
-
-    // Notch (IC look)
-    if (def.category === '74HC Series' || def.category === 'Memory') {
+    ctx.strokeStyle = '#CC0000';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.2);
+    const sz = this.zoom * 1.2;
+    for (const nc of this.sch.noConnects) {
+      const s = this.mmToScreen(nc.at.x, nc.at.y);
       ctx.beginPath();
-      ctx.arc(x + w / 2, y + 1, 5, 0, Math.PI);
-      ctx.strokeStyle = '#888';
-      ctx.lineWidth = 1;
+      ctx.moveTo(s.x - sz, s.y - sz); ctx.lineTo(s.x + sz, s.y + sz);
+      ctx.moveTo(s.x + sz, s.y - sz); ctx.lineTo(s.x - sz, s.y + sz);
       ctx.stroke();
     }
+  }
 
-    // Component name
-    ctx.fillStyle = def.labelColor || '#000080';
-    ctx.font = 'bold 11px "Segoe UI", Tahoma, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(def.name, x + w / 2, y + 4);
-
-    // Label below name
-    if (comp.label && comp.label !== def.name) {
-      ctx.fillStyle = '#666';
-      ctx.font = '10px "Segoe UI", Tahoma, sans-serif';
-      ctx.fillText(comp.label, x + w / 2, y + 16);
-    }
-
-    // LED glow
-    if (def.id === 'led') {
-      const lit = comp.internalState.lit;
-      ctx.beginPath();
-      ctx.arc(x + w / 2, y + h / 2 + 4, 8, 0, Math.PI * 2);
-      ctx.fillStyle = lit ? '#FF0000' : '#660000';
-      ctx.fill();
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      if (lit) {
-        ctx.beginPath();
-        ctx.arc(x + w / 2, y + h / 2 + 4, 12, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
-        ctx.fill();
+  drawSymbol(inst) {
+    const lib = this.sch.libSymbols[inst.libId];
+    if (!lib) return;
+    for (const unit of lib.units) {
+      const parts = unit.name.split('_');
+      const uNum = parseInt(parts[parts.length - 2]) || 0;
+      if (uNum !== 0 && uNum !== inst.unit) continue;
+      for (const r of unit.rectangles) this.drawRect(r, inst);
+      for (const p of unit.polylines) this.drawPolyline(p, inst);
+      for (const c of unit.circles) this.drawCircle(c, inst);
+      for (const a of unit.arcs) this.drawArc(a, inst);
+      if (this.showLabels) {
+        for (const pin of unit.pins) this.drawPin(pin, inst, lib);
       }
     }
-
-    // 7-seg display
-    if (def.id === 'hex_display') {
-      const ch = comp.internalState.hexChar || '0';
-      ctx.fillStyle = '#FF3333';
-      ctx.font = 'bold 36px "VT323", monospace';
+    const ctx = this.ctx;
+    for (const key of ['Reference', 'Value']) {
+      const prop = inst.properties[key];
+      if (!prop || prop.hide) continue;
+      const s = this.mmToScreen(prop.at.x, prop.at.y);
+      ctx.fillStyle = key === 'Reference' ? '#CC0000' : '#000080';
+      const fs = Math.max(8, this.zoom * 1.27);
+      ctx.font = `${fs}px "VT323", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(ch, x + w / 2, y + h / 2 + 8);
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      if (prop.at.angle === 90 || prop.at.angle === 270) ctx.rotate(-Math.PI / 2);
+      ctx.fillText(String(prop.value || ''), 0, 0);
+      ctx.restore();
     }
-
-    // Switch state
-    if (def.id === 'switch') {
-      const on = comp.properties.state === '1';
-      ctx.fillStyle = on ? '#00CC00' : '#CC0000';
-      ctx.fillRect(x + w / 2 - 8, y + h / 2 - 4, 16, 8);
-      ctx.fillStyle = '#FFF';
-      ctx.fillRect(on ? x + w / 2 : x + w / 2 - 8, y + h / 2 - 4, 8, 8);
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + w / 2 - 8, y + h / 2 - 4, 16, 8);
-    }
-
-    // Pins
-    for (const pin of def.pins) {
-      this.drawPin(comp, pin);
-    }
-
-    ctx.restore();
   }
 
-  drawPin(comp, pinDef) {
+  drawRect(r, inst) {
     const ctx = this.ctx;
-    const pos = comp.getPinPosition(pinDef.name);
-    if (!pos) return;
-
-    const x = comp.x;
-    const y = comp.y;
-    const w = comp.def.width;
-    const spacing = 20;
-
-    // Pin stub line
-    let stubEndX = pos.x;
-    let stubEndY = pos.y;
-    let labelX = pos.x;
-    let labelY = pos.y;
-    let textAlign = 'left';
-
-    switch (pinDef.side) {
-      case 'left':
-        stubEndX = pos.x - 10;
-        labelX = pos.x + 4;
-        textAlign = 'left';
-        break;
-      case 'right':
-        stubEndX = pos.x + 10;
-        labelX = pos.x - 4;
-        textAlign = 'right';
-        break;
-      case 'top':
-        stubEndY = pos.y - 10;
-        labelY = pos.y + 4;
-        textAlign = 'center';
-        break;
-      case 'bottom':
-        stubEndY = pos.y + 10;
-        labelY = pos.y - 4;
-        textAlign = 'center';
-        break;
+    const a = this.transformPt(r.start.x, r.start.y, inst);
+    const b = this.transformPt(r.end.x, r.end.y, inst);
+    const sa = this.mmToScreen(Math.min(a.x, b.x), Math.min(a.y, b.y));
+    const sb = this.mmToScreen(Math.max(a.x, b.x), Math.max(a.y, b.y));
+    if (r.fill === 'background' || r.fill === 'outline') {
+      ctx.fillStyle = r.fill === 'outline' ? '#000000' : '#FFFFF0';
+      ctx.fillRect(sa.x, sa.y, sb.x - sa.x, sb.y - sa.y);
     }
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+    ctx.strokeRect(sa.x, sa.y, sb.x - sa.x, sb.y - sa.y);
+  }
 
-    // Pin line
-    const state = comp.pinStates[pinDef.name];
-    switch (state) {
-      case SIGNAL.HIGH: ctx.strokeStyle = '#DD2222'; break;
-      case SIGNAL.LOW: ctx.strokeStyle = '#2244AA'; break;
-      case SIGNAL.Z: ctx.strokeStyle = '#888888'; break;
-      default: ctx.strokeStyle = '#006600';
-    }
-    ctx.lineWidth = 1.5;
+  drawPolyline(p, inst) {
+    if (p.points.length < 2) return;
+    const ctx = this.ctx;
     ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    ctx.lineTo(stubEndX, stubEndY);
-    ctx.stroke();
-
-    // Inversion bubble
-    if (pinDef.inverted) {
-      const bx = pinDef.side === 'right' ? pos.x + 3 : pinDef.side === 'left' ? pos.x - 3 : pos.x;
-      const by = pinDef.side === 'bottom' ? pos.y + 3 : pinDef.side === 'top' ? pos.y - 3 : pos.y;
-      ctx.beginPath();
-      ctx.arc(bx, by, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFF';
+    for (let i = 0; i < p.points.length; i++) {
+      const pt = this.transformPt(p.points[i].x, p.points[i].y, inst);
+      const s = this.mmToScreen(pt.x, pt.y);
+      i === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y);
+    }
+    if (p.fill === 'outline' || p.fill === 'background') {
+      ctx.fillStyle = p.fill === 'outline' ? '#000000' : '#FFFFF0';
       ctx.fill();
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1;
+    }
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+    ctx.stroke();
+  }
+
+  drawCircle(c, inst) {
+    const ctx = this.ctx;
+    const center = this.transformPt(c.center.x, c.center.y, inst);
+    const s = this.mmToScreen(center.x, center.y);
+    const r = c.radius * this.zoom;
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    if (c.fill === 'outline' || c.fill === 'background') {
+      ctx.fillStyle = c.fill === 'outline' ? '#000000' : '#FFFFF0';
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+    ctx.stroke();
+  }
+
+  drawArc(a, inst) {
+    const ctx = this.ctx;
+    const p1 = this.transformPt(a.start.x, a.start.y, inst);
+    const pm = this.transformPt(a.mid.x, a.mid.y, inst);
+    const p2 = this.transformPt(a.end.x, a.end.y, inst);
+    const s1 = this.mmToScreen(p1.x, p1.y);
+    const sm = this.mmToScreen(pm.x, pm.y);
+    const s2 = this.mmToScreen(p2.x, p2.y);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+    const cx = this.arcCenter(s1.x, s1.y, sm.x, sm.y, s2.x, s2.y);
+    if (cx) {
+      const r = Math.sqrt((s1.x - cx.x) ** 2 + (s1.y - cx.y) ** 2);
+      const a1 = Math.atan2(s1.y - cx.y, s1.x - cx.x);
+      const am = Math.atan2(sm.y - cx.y, sm.x - cx.x);
+      const a2 = Math.atan2(s2.y - cx.y, s2.x - cx.x);
+      ctx.beginPath();
+      ctx.arc(cx.x, cx.y, r, a1, a2, this.isCounterClockwise(a1, am, a2));
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y);
+      ctx.quadraticCurveTo(sm.x, sm.y, s2.x, s2.y);
+      ctx.stroke();
+    }
+  }
+
+  arcCenter(x1, y1, x2, y2, x3, y3) {
+    const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+    if (Math.abs(D) < 1e-10) return null;
+    const ux = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / D;
+    const uy = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / D;
+    return { x: ux, y: uy };
+  }
+
+  isCounterClockwise(a1, am, a2) {
+    const norm = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const n1 = norm(a1), nm = norm(am), n2 = norm(a2);
+    const cw1 = norm(n1 - nm), cw2 = norm(nm - n2);
+    const ccw1 = norm(nm - n1), ccw2 = norm(n2 - nm);
+    return (ccw1 + ccw2) < (cw1 + cw2);
+  }
+
+  drawPin(pin, inst, lib) {
+    const ctx = this.ctx;
+    const connPt = this.transformPt(pin.at.x, pin.at.y, inst);
+    let dirAngle = pin.at.angle;
+    if (inst.mirrorX) {
+      if (dirAngle === 0) dirAngle = 180;
+      else if (dirAngle === 180) dirAngle = 0;
+    }
+    if (inst.mirrorY) {
+      if (dirAngle === 90) dirAngle = 270;
+      else if (dirAngle === 270) dirAngle = 90;
+    }
+    dirAngle = (dirAngle + inst.at.angle) % 360;
+    const rad = dirAngle * Math.PI / 180;
+    const dx = Math.cos(rad), dy = -Math.sin(rad);
+    const bodyX = connPt.x - pin.length * dx;
+    const bodyY = connPt.y + pin.length * dy;
+    const sConn = this.mmToScreen(connPt.x, connPt.y);
+    const sBody = this.mmToScreen(bodyX, bodyY);
+
+    ctx.strokeStyle = '#006600';
+    ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+    ctx.beginPath(); ctx.moveTo(sBody.x, sBody.y); ctx.lineTo(sConn.x, sConn.y); ctx.stroke();
+
+    const cr = Math.max(1.5, this.zoom * 0.35);
+    ctx.fillStyle = '#006600';
+    ctx.beginPath(); ctx.arc(sConn.x, sConn.y, cr, 0, Math.PI * 2); ctx.fill();
+
+    if (pin.graphType === 'inverted') {
+      const ir = this.zoom * 0.5;
+      ctx.strokeStyle = '#006600';
+      ctx.lineWidth = Math.max(1, this.zoom * 0.12);
+      ctx.beginPath();
+      ctx.arc(sBody.x + (sConn.x - sBody.x) * 0.15, sBody.y + (sConn.y - sBody.y) * 0.15, ir, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // Pin dot
-    ctx.beginPath();
-    ctx.arc(stubEndX, stubEndY, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#006600';
-    ctx.fill();
+    const fs = Math.max(6, this.zoom * 1.0);
+    if (fs < 6) return;
+    ctx.font = `${fs}px "VT323", monospace`;
 
-    // Pin label
-    if (this.showLabels) {
-      ctx.fillStyle = '#446644';
-      ctx.font = '9px "Segoe UI", Tahoma, sans-serif';
-      ctx.textAlign = textAlign;
+    if (pin.name && pin.name !== '~' && !lib.pinNamesHide) {
+      ctx.fillStyle = '#006600';
       ctx.textBaseline = 'middle';
-      ctx.fillText(pinDef.name, labelX, labelY);
+      const off = lib.pinNamesOffset * this.zoom + 2;
+      if (dirAngle === 0 || dirAngle === 180) {
+        ctx.textAlign = dirAngle === 0 ? 'right' : 'left';
+        ctx.fillText(pin.name, sBody.x + (dirAngle === 0 ? -off : off), sBody.y);
+      } else {
+        ctx.textAlign = 'center';
+        ctx.fillText(pin.name, sBody.x, sBody.y + (dirAngle === 90 ? off : -off));
+      }
+    }
+
+    if (pin.number && pin.number !== '~') {
+      ctx.fillStyle = '#CC0000';
+      ctx.font = `${Math.max(5, fs * 0.8)}px "VT323", monospace`;
+      ctx.textBaseline = 'middle';
+      const mx = (sConn.x + sBody.x) / 2, my = (sConn.y + sBody.y) / 2;
+      if (dirAngle === 0 || dirAngle === 180) {
+        ctx.textAlign = 'center';
+        ctx.fillText(pin.number, mx, my - fs * 0.7);
+      } else {
+        ctx.textAlign = 'left';
+        ctx.fillText(pin.number, mx + fs * 0.3, my);
+      }
     }
   }
 
-  // ========== DEMO CIRCUITS ==========
-
-  loadDemo(name) {
-    this.saveState();
-    this.components = [];
-    this.wires = [];
-    this.selected = null;
-    this.selectedWire = null;
-
-    switch (name) {
-      case 'counter':
-        this.loadCounterDemo();
-        break;
-      case '486':
-        this.load486Demo();
-        break;
+  drawLabels() {
+    const ctx = this.ctx;
+    for (const l of this.sch.labels) {
+      const s = this.mmToScreen(l.at.x, l.at.y);
+      const fs = Math.max(8, this.zoom * 1.27);
+      ctx.font = `${fs}px "VT323", monospace`;
+      ctx.fillStyle = '#006600';
+      ctx.textBaseline = 'bottom';
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      if (l.at.angle === 90 || l.at.angle === 270) ctx.rotate(-Math.PI / 2);
+      if (l.at.angle === 180) ctx.rotate(Math.PI);
+      ctx.textAlign = 'left';
+      const tw = ctx.measureText(l.text).width;
+      ctx.strokeStyle = '#006600';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(tw + 4, 0); ctx.stroke();
+      ctx.fillText(l.text, 2, -2);
+      ctx.restore();
     }
-
-    this.draw();
-    this.zoomToFit();
-    if (this.onComponentsChange) this.onComponentsChange();
   }
 
-  loadCounterDemo() {
-    const clk = this.addComponent('clock', 50, 100);
-    clk.label = 'CLK_1Hz';
-
-    const counter = this.addComponent('74hc161', 200, 60);
-    counter.label = 'U1';
-
-    const led0 = this.addComponent('led', 380, 60);
-    led0.label = 'Q0';
-    const led1 = this.addComponent('led', 380, 100);
-    led1.label = 'Q1';
-    const led2 = this.addComponent('led', 380, 140);
-    led2.label = 'Q2';
-    const led3 = this.addComponent('led', 380, 180);
-    led3.label = 'Q3';
-
-    const vcc = this.addComponent('vcc', 120, 20);
-    vcc.label = 'VCC';
-
-    const disp = this.addComponent('hex_display', 460, 60);
-    disp.label = 'DISP';
-
-    // Wire clock to counter
-    this.wires.push(new Wire(110, 120, 200, 80));
-    // VCC to enables
-    this.wires.push(new Wire(140, 50, 140, 100));
-    this.wires.push(new Wire(140, 100, 200, 100));
-    this.wires.push(new Wire(140, 100, 140, 120));
-    this.wires.push(new Wire(140, 120, 200, 120));
-    // VCC to /CLR
-    this.wires.push(new Wire(140, 50, 160, 50));
-    this.wires.push(new Wire(160, 50, 160, 90));
-    this.wires.push(new Wire(160, 90, 200, 90));
-
-    // Counter outputs to LEDs
-    this.wires.push(new Wire(280, 80, 380, 80));
-    this.wires.push(new Wire(280, 100, 380, 120));
-    this.wires.push(new Wire(280, 120, 380, 160));
-    this.wires.push(new Wire(280, 140, 380, 200));
-
-    // Counter to 7seg
-    this.wires.push(new Wire(380, 80, 460, 80));
-    this.wires.push(new Wire(380, 120, 460, 100));
-    this.wires.push(new Wire(380, 160, 460, 120));
-    this.wires.push(new Wire(380, 200, 460, 140));
-
-    // GND for /LOAD
-    const gnd = this.addComponent('vcc', 120, 180);
-    gnd.label = 'VCC_LOAD';
-    this.wires.push(new Wire(140, 210, 140, 140));
-    this.wires.push(new Wire(140, 140, 200, 140));
+  drawGlobalLabels() {
+    const ctx = this.ctx;
+    for (const l of this.sch.globalLabels) {
+      const s = this.mmToScreen(l.at.x, l.at.y);
+      const fs = Math.max(8, this.zoom * 1.27);
+      ctx.font = `bold ${fs}px "VT323", monospace`;
+      const tw = ctx.measureText(l.text).width + 10;
+      const th = fs + 4;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      if (l.at.angle === 90 || l.at.angle === 270) ctx.rotate(-Math.PI / 2);
+      if (l.at.angle === 180) ctx.rotate(Math.PI);
+      ctx.fillStyle = '#FFF8F0';
+      ctx.strokeStyle = '#CC0000';
+      ctx.lineWidth = Math.max(1, this.zoom * 0.15);
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(6, -th / 2); ctx.lineTo(tw, -th / 2);
+      ctx.lineTo(tw, th / 2); ctx.lineTo(6, th / 2); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#CC0000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(l.text, tw / 2 + 3, 1);
+      ctx.restore();
+    }
   }
 
-  load486Demo() {
-    // Simplified i486 system block diagram
-    const cpu = this.addComponent('header_8pin', 100, 100);
-    cpu.label = 'i486 CPU';
-
-    const decoder = this.addComponent('74hc138', 300, 80);
-    decoder.label = 'ADDR_DECODE';
-
-    const ram = this.addComponent('sram_32k', 500, 60);
-    ram.label = 'RAM';
-
-    const rom = this.addComponent('eeprom_64k', 500, 220);
-    rom.label = 'BIOS ROM';
-
-    const clk = this.addComponent('clock', 10, 100);
-    clk.label = 'CLK_33MHz';
-
-    const buf = this.addComponent('74hc245', 300, 280);
-    buf.label = 'DATA_BUF';
-
-    // Clock to CPU
-    this.wires.push(new Wire(70, 120, 100, 120));
-
-    // CPU address to decoder
-    this.wires.push(new Wire(140, 120, 300, 100));
-    this.wires.push(new Wire(140, 140, 300, 120));
-    this.wires.push(new Wire(140, 160, 300, 140));
-
-    // Decoder outputs to chip selects
-    this.wires.push(new Wire(380, 100, 500, 100));
-    this.wires.push(new Wire(380, 120, 420, 120));
-    this.wires.push(new Wire(420, 120, 420, 260));
-    this.wires.push(new Wire(420, 260, 500, 260));
-
-    // CPU data to bus buffer
-    this.wires.push(new Wire(140, 180, 200, 180));
-    this.wires.push(new Wire(200, 180, 200, 300));
-    this.wires.push(new Wire(200, 300, 300, 300));
+  drawHierLabels() {
+    if (!this.sch.hierLabels) return;
+    const ctx = this.ctx;
+    for (const l of this.sch.hierLabels) {
+      const s = this.mmToScreen(l.at.x, l.at.y);
+      const fs = Math.max(8, this.zoom * 1.27);
+      ctx.font = `${fs}px "VT323", monospace`;
+      ctx.fillStyle = '#804000';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(l.text, s.x + 4, s.y);
+    }
   }
+
+  drawTextItems() {
+    if (!this.sch.text) return;
+    const ctx = this.ctx;
+    for (const t of this.sch.text) {
+      const s = this.mmToScreen(t.at.x, t.at.y);
+      const fs = Math.max(8, this.zoom * 1.27);
+      ctx.font = `${fs}px "VT323", monospace`;
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(t.text), s.x, s.y);
+    }
+  }
+
+  drawSheets() {
+    if (!this.sch.sheets) return;
+    const ctx = this.ctx;
+    for (const sh of this.sch.sheets) {
+      const s = this.mmToScreen(sh.at.x, sh.at.y);
+      const sw = sh.w * this.zoom, shh = sh.h * this.zoom;
+      ctx.fillStyle = '#F0FFF0';
+      ctx.fillRect(s.x, s.y, sw, shh);
+      ctx.strokeStyle = '#008000';
+      ctx.lineWidth = Math.max(1, this.zoom * 0.2);
+      ctx.strokeRect(s.x, s.y, sw, shh);
+      const name = sh.properties['Sheetname'] || sh.properties['Sheet name'] || 'Sheet';
+      const fs = Math.max(8, this.zoom * 1.5);
+      ctx.font = `bold ${fs}px "VT323", monospace`;
+      ctx.fillStyle = '#008000';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, s.x + 4, s.y + 2);
+    }
+  }
+
+  drawSelection() {
+    if (!this.selected) return;
+    const ctx = this.ctx;
+    const lib = this.sch.libSymbols[this.selected.libId];
+    let r = 8;
+    if (lib) {
+      for (const u of lib.units) {
+        for (const rect of u.rectangles) {
+          r = Math.max(r, Math.max(Math.abs(rect.end.x - rect.start.x), Math.abs(rect.end.y - rect.start.y)) / 2 + 3);
+        }
+      }
+    }
+    const s = this.mmToScreen(this.selected.at.x, this.selected.at.y);
+    const sr = r * this.zoom;
+    ctx.strokeStyle = '#0000FF';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(s.x - sr, s.y - sr, sr * 2, sr * 2);
+    ctx.setLineDash([]);
+  }
+
+  setTool() {}
+  saveState() {}
+  deleteSelected() {}
+  undo() {}
+  redo() {}
+  loadDemo() {}
+  addComponent() {}
+  screenToWorld(x, y) { return this.screenToMm(x, y); }
 }
