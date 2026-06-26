@@ -1,0 +1,41 @@
+Item,Quantity,Board,Source,Est. Cost (EUR),Notes
+i486DX-33 CPU,1,B2,Buy (eBay),2.00,PGA-168 package
+EPM7128STC100 CPLD,1,B3,Buy (eBay),3.00,TQFP-100 package
+1MB 30-pin SIMM,4,B4,Buy (eBay),2.00,4x 1MB = 4MB total
+ISA VGA card (8-bit),1,B7,Buy (eBay),5.00,"Trident, Cirrus Logic, or Oak"
+28C512 EEPROM,1,B6,Buy (eBay),1.00,DIP-28 64KB
+ZIF-28 socket,1,B6,Buy (eBay),1.00,For removable EEPROM
+PCB 10x10cm 4-layer,10,All,JLCPCB,7.00,2 orders of 5pcs
+Right-angle 2x30 pin header (male),16,All,AliExpress,1.00,60-pin bus connectors
+Right-angle 2x30 pin header (female),16,All,AliExpress,1.00,60-pin bus connectors
+M3 standoffs + screws,Set,All,AliExpress,1.00,Board-to-board mounting
+PGA-168 socket,1,B2,Salvage,0.00,From 486 motherboard
+33MHz crystal oscillator,1,B2,Salvage,0.00,DIP-14 or DIP-8 can
+74HC245 bus transceiver,6,B2/B3/B5,Salvage,0.00,DIP-20
+74HC257 quad mux,4,B4,Salvage,0.00,DIP-16 for RAS/CAS mux
+74HC14 Schmitt trigger,1,B2,Salvage,0.00,DIP-14 hex inverter
+7805 voltage regulator,1,B1,Salvage,0.00,TO-220 5V 1A
+1N4007 diode,1,B1,Salvage,0.00,Reverse polarity protection
+82077AA or PC8477 FDC,1,B5,Salvage,0.00,From ISA multi-I/O card
+16550 UART,1,B6,Salvage,0.00,DIP-40
+MAX232,1,B6,Salvage,0.00,DIP-16 RS-232 driver
+8042 keyboard controller,1,B6,Salvage,0.00,From old motherboard
+100nF ceramic caps,30,All,Salvage,0.00,Decoupling
+10uF electrolytic caps,10,B1,Salvage,0.00,Bulk decoupling
+470uF electrolytic cap,2,B1,Salvage,0.00,Input filter
+30-pin SIMM socket,4,B4,Salvage,0.00,From old motherboard
+8-bit ISA edge connector,1,B7,Salvage,0.00,From old motherboard
+DB-9 female connector,1,B6,Salvage,0.00,Serial port
+PS/2 mini-DIN connector,1,B6,Salvage,0.00,Keyboard
+12V barrel jack,1,B1,Salvage,0.00,Power input
+34-pin floppy header,1,B5,Salvage,0.00,2x17 box header
+40-pin IDE header,1,B5,Salvage,0.00,2x20 box header
+LEDs (various),10,B1/B8,Salvage,0.00,Power + debug indicators
+7-segment display (common cathode),2,B8,Salvage,0.00,POST code display
+DIP switch 8-pos,1,B8,Salvage,0.00,Debug address override
+Piezo buzzer,1,B6,Salvage,0.00,POST beep codes
+Resistors (assorted),50,All,Salvage,0.00,"Pull-ups, LED current limit, termination"
+3.5" 1.44MB floppy drive,1,External,Salvage,0.00,
+~4MB IDE HDD,1,External,Salvage,0.00,
+PS/2 keyboard,1,External,Salvage,0.00,
+VGA monitor,1,External,Salvage,0.00,
