@@ -1,0 +1,385 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+:root {
+  --bg: #C0C0C0;
+  --bg-dark: #808080;
+  --bg-darker: #404040;
+  --bg-light: #DFDFDF;
+  --white: #FFFFFF;
+  --black: #000000;
+  --title-active: #000080;
+  --title-inactive: #808080;
+  --title-text: #FFFFFF;
+  --highlight: #000080;
+  --highlight-text: #FFFFFF;
+  --sunken-outer: #808080;
+  --sunken-inner: #404040;
+  --raised-outer: #FFFFFF;
+  --raised-inner: #DFDFDF;
+  --font-main: 'Segoe UI', 'Tahoma', 'Geneva', sans-serif;
+  --font-mono: 'VT323', 'Courier New', monospace;
+  --font-size: 12px;
+
+  --wire-low: #0044AA;
+  --wire-high: #FF4444;
+  --wire-z: #888888;
+  --wire-unknown: #FF8800;
+  --grid-color: #B0B0B0;
+  --grid-dot: #A0A0A0;
+  --canvas-bg: #F5F0E8;
+  --component-bg: #FFFFF0;
+  --component-border: #000000;
+  --component-selected: #0000FF;
+  --pin-color: #006600;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-main);
+  font-size: var(--font-size);
+  background: #008080;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#desktop {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+}
+
+/* Raised border (button-like) */
+.raised {
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+}
+
+/* Sunken border (input-like) */
+.sunken {
+  border: 2px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+}
+
+/* ========== MENU BAR ========== */
+#menubar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bg-dark);
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.menu-item {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.menu-label {
+  padding: 2px 8px;
+  cursor: default;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.menu-label:hover, .menu-item.open .menu-label {
+  background: var(--highlight);
+  color: var(--highlight-text);
+}
+
+.menu-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+  z-index: 9999;
+  padding: 2px;
+}
+
+.menu-item.open .menu-dropdown {
+  display: block;
+}
+
+.menu-entry {
+  padding: 4px 24px 4px 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.menu-entry:hover {
+  background: var(--highlight);
+  color: var(--highlight-text);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 3px 4px;
+  border-top: 1px solid var(--bg-dark);
+  border-bottom: 1px solid var(--white);
+}
+
+#menubar-title {
+  margin-left: auto;
+  padding-right: 8px;
+  color: var(--bg-dark);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ========== TOOLBAR ========== */
+#toolbar {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bg-dark);
+  padding: 2px 4px;
+  gap: 2px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--white);
+}
+
+.tool-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--black);
+}
+
+.tool-btn:hover {
+  background: var(--bg-light);
+}
+
+.tool-btn:active, .tool-btn.active {
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+  background: var(--bg-light);
+}
+
+.tool-btn.active {
+  background: #D0D0D0;
+}
+
+.sim-btn[data-action="sim-start"] { color: #008000; }
+.sim-btn[data-action="sim-stop"] { color: #CC0000; }
+
+.tool-sep {
+  width: 2px;
+  height: 24px;
+  margin: 0 3px;
+  border-left: 1px solid var(--bg-dark);
+  border-right: 1px solid var(--white);
+}
+
+.status-indicator {
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: bold;
+  border: 1px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+  margin: 0 4px;
+}
+
+.status-indicator.off {
+  background: #2A2A2A;
+  color: #666;
+}
+
+.status-indicator.running {
+  background: #002200;
+  color: #00FF00;
+}
+
+.status-indicator.paused {
+  background: #332200;
+  color: #FFAA00;
+}
+
+#sim-cycle, #sim-freq {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 0 6px;
+  color: var(--bg-darker);
+}
+
+/* ========== WIN95 BUTTONS ========== */
+.win95-btn {
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  padding: 4px 16px;
+  font-family: var(--font-main);
+  font-size: var(--font-size);
+  cursor: pointer;
+}
+
+.win95-btn:active {
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+}
+
+.win95-btn:hover {
+  background: var(--bg-light);
+}
+
+.win95-btn.small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* ========== STATUS BAR ========== */
+#statusbar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  background: var(--bg);
+  border-top: 1px solid var(--white);
+  padding: 0 4px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+#statusbar span {
+  padding: 1px 8px;
+  border: 1px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+  font-size: 11px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+#status-msg {
+  flex: 1;
+}
+
+/* ========== DIALOGS ========== */
+.win95-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
+  z-index: 10000;
+  min-width: 350px;
+}
+
+.dialog-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  background: var(--title-active);
+  color: var(--title-text);
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.dialog-close {
+  width: 18px;
+  height: 18px;
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.dialog-body {
+  padding: 16px;
+  text-align: center;
+}
+
+.dialog-body hr {
+  border: none;
+  border-top: 1px solid var(--bg-dark);
+  border-bottom: 1px solid var(--white);
+  margin: 8px 0;
+}
+
+.about-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.shortcuts-body {
+  text-align: left;
+}
+
+.shortcuts-body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcuts-body td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--bg-dark);
+}
+
+kbd {
+  background: var(--bg-light);
+  border: 1px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: 2px;
+}
+
+/* ========== SCROLLBAR (retro) ========== */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: repeating-conic-gradient(var(--bg) 0% 25%, var(--bg-light) 0% 50%) 50% / 2px 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+}
+
+::-webkit-scrollbar-button {
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  display: block;
+  height: 16px;
+  width: 16px;
+}
