@@ -1,0 +1,445 @@
+/* ========== WORKSPACE LAYOUT ========== */
+#workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ========== LIBRARY PANEL ========== */
+#library-panel {
+  width: 220px;
+  min-width: 180px;
+  background: var(--bg);
+  border-right: 2px solid;
+  border-right-color: var(--bg-dark);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  background: var(--title-active);
+  color: var(--title-text);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+#library-search {
+  padding: 4px;
+}
+
+#lib-search-input {
+  width: 100%;
+  padding: 3px 6px;
+  font-family: var(--font-main);
+  font-size: 12px;
+  border: 2px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+  background: white;
+}
+
+#library-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px;
+  background: white;
+  margin: 0 4px 4px 4px;
+  border: 2px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+}
+
+.lib-category {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 3px 4px;
+  font-size: 12px;
+  color: var(--title-active);
+  background: var(--bg-light);
+  margin-top: 1px;
+}
+
+.lib-category:hover {
+  background: var(--bg);
+}
+
+.lib-category::before {
+  content: '+ ';
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.lib-category.open::before {
+  content: '- ';
+}
+
+.lib-items {
+  display: none;
+}
+
+.lib-category.open + .lib-items {
+  display: block;
+}
+
+.lib-item {
+  padding: 3px 8px 3px 20px;
+  cursor: grab;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-item:hover {
+  background: var(--highlight);
+  color: var(--highlight-text);
+}
+
+.lib-item .chip-icon {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: #333;
+  color: #0F0;
+  padding: 1px 3px;
+  border-radius: 1px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ========== SCHEMATIC CANVAS ========== */
+#canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas-bg);
+  border: 2px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+  cursor: crosshair;
+}
+
+#schematic-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#canvas-coords {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--bg-dark);
+  background: rgba(255,255,255,0.7);
+  padding: 1px 6px;
+}
+
+/* ========== RIGHT PANEL ========== */
+#right-panel {
+  width: 220px;
+  min-width: 180px;
+  background: var(--bg);
+  border-left: 2px solid;
+  border-left-color: var(--bg-dark);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.panel-tabs {
+  display: flex;
+  padding: 2px 2px 0 2px;
+  gap: 1px;
+}
+
+.panel-tab {
+  padding: 3px 10px;
+  background: var(--bg);
+  border: 1px solid var(--bg-dark);
+  border-bottom: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-main);
+}
+
+.panel-tab.active {
+  background: var(--bg-light);
+  border-bottom: 1px solid var(--bg-light);
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-light);
+  border: 1px solid var(--bg-dark);
+  margin: 0 2px 2px 2px;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.hint-text {
+  color: var(--bg-dark);
+  font-style: italic;
+  font-size: 11px;
+  padding: 8px;
+}
+
+/* Properties */
+.prop-group {
+  margin-bottom: 8px;
+}
+
+.prop-group-title {
+  font-weight: bold;
+  font-size: 11px;
+  color: var(--title-active);
+  padding: 2px 4px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bg-dark);
+  margin-bottom: 4px;
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.prop-label {
+  width: 80px;
+  flex-shrink: 0;
+  color: var(--bg-darker);
+}
+
+.prop-value {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.prop-input {
+  width: 100%;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  border: 1px solid;
+  border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
+}
+
+/* Board list */
+.board-entry {
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-entry:hover {
+  background: var(--bg);
+}
+
+.board-entry.active {
+  background: var(--highlight);
+  color: var(--highlight-text);
+}
+
+.board-icon {
+  font-size: 10px;
+}
+
+.board-actions {
+  padding: 4px;
+  border-top: 1px solid var(--bg-dark);
+  margin-top: 4px;
+}
+
+/* ========== BOTTOM PANEL ========== */
+#bottom-panel {
+  height: 180px;
+  min-height: 60px;
+  background: var(--bg);
+  border-top: 2px solid;
+  border-top-color: var(--bg-dark);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+#bottom-resize-handle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 10;
+}
+
+#bottom-panel > .panel-tabs {
+  border-bottom: 1px solid var(--bg-dark);
+}
+
+#waveform-tab {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+#waveform-tab.active {
+  display: flex;
+}
+
+#waveform-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bg-dark);
+}
+
+#wave-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin-left: 8px;
+  color: var(--bg-darker);
+}
+
+#waveform-container {
+  flex: 1;
+  position: relative;
+  background: #1A1A2E;
+  overflow: hidden;
+}
+
+#waveform-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Console */
+#console-tab {
+  padding: 0;
+}
+
+#console-output {
+  height: 100%;
+  overflow-y: auto;
+  background: #0C0C0C;
+  color: #00FF00;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 6px;
+  line-height: 1.3;
+}
+
+.console-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.console-line.info { color: #00CCFF; }
+.console-line.warn { color: #FFAA00; }
+.console-line.error { color: #FF4444; }
+.console-line.sim { color: #AAFFAA; }
+
+/* ========== COMPONENT RENDERING (CSS for overlays) ========== */
+.component-tooltip {
+  position: absolute;
+  background: #FFFFF0;
+  border: 1px solid #000;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+  max-width: 250px;
+}
+
+.component-tooltip .tt-name {
+  font-weight: bold;
+  color: var(--title-active);
+}
+
+.component-tooltip .tt-desc {
+  color: #444;
+  margin-top: 2px;
+}
+
+.component-tooltip .tt-pins {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #006600;
+}
+
+/* ========== DRAG PREVIEW ========== */
+#drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 5000;
+  opacity: 0.7;
+}
+
+/* ========== CONTEXT MENU ========== */
+.context-menu {
+  position: fixed;
+  background: var(--bg);
+  border: 2px solid;
+  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+  z-index: 10000;
+  min-width: 160px;
+  padding: 2px;
+}
+
+.ctx-entry {
+  padding: 4px 24px 4px 8px;
+  cursor: default;
+  font-size: 12px;
+}
+
+.ctx-entry:hover {
+  background: var(--highlight);
+  color: var(--highlight-text);
+}
+
+.ctx-separator {
+  height: 1px;
+  margin: 3px 4px;
+  border-top: 1px solid var(--bg-dark);
+  border-bottom: 1px solid var(--white);
+}
+
+/* ========== CRT SCANLINE OVERLAY (subtle) ========== */
+#desktop::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 99999;
+}
