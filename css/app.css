@@ -84,7 +84,7 @@
 
 .lib-item {
   padding: 3px 8px 3px 20px;
-  cursor: grab;
+  cursor: pointer;
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -133,6 +133,7 @@
   color: var(--bg-dark);
   background: rgba(255,255,255,0.7);
   padding: 1px 6px;
+  z-index: 60;
 }
 
 /* ========== RIGHT PANEL ========== */
@@ -222,6 +223,7 @@
   flex: 1;
   font-family: var(--font-mono);
   font-size: 13px;
+  word-break: break-all;
 }
 
 .prop-input {
@@ -233,39 +235,10 @@
   border-color: var(--sunken-outer) var(--raised-outer) var(--raised-outer) var(--sunken-outer);
 }
 
-/* Board list */
-.board-entry {
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.board-entry:hover {
-  background: var(--bg);
-}
-
-.board-entry.active {
-  background: var(--highlight);
-  color: var(--highlight-text);
-}
-
-.board-icon {
-  font-size: 10px;
-}
-
-.board-actions {
-  padding: 4px;
-  border-top: 1px solid var(--bg-dark);
-  margin-top: 4px;
-}
-
 /* ========== BOTTOM PANEL ========== */
 #bottom-panel {
-  height: 180px;
-  min-height: 60px;
+  height: 120px;
+  min-height: 40px;
   background: var(--bg);
   border-top: 2px solid;
   border-top-color: var(--bg-dark);
@@ -287,47 +260,6 @@
 
 #bottom-panel > .panel-tabs {
   border-bottom: 1px solid var(--bg-dark);
-}
-
-#waveform-tab {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-}
-
-#waveform-tab.active {
-  display: flex;
-}
-
-#waveform-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--bg-dark);
-}
-
-#wave-time {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  margin-left: 8px;
-  color: var(--bg-darker);
-}
-
-#waveform-container {
-  flex: 1;
-  position: relative;
-  background: #1A1A2E;
-  overflow: hidden;
-}
-
-#waveform-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
 }
 
 /* Console */
@@ -356,73 +288,74 @@
 .console-line.error { color: #FF4444; }
 .console-line.sim { color: #AAFFAA; }
 
-/* ========== COMPONENT RENDERING (CSS for overlays) ========== */
-.component-tooltip {
+/* ========== DROP ZONE ========== */
+.drop-zone {
   position: absolute;
-  background: #FFFFF0;
-  border: 1px solid #000;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--font-main);
-  pointer-events: none;
-  z-index: 1000;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
-  max-width: 250px;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 240, 232, 0.95);
+  z-index: 50;
 }
 
-.component-tooltip .tt-name {
-  font-weight: bold;
-  color: var(--title-active);
+.drop-zone.active {
+  background: rgba(0, 0, 128, 0.08);
+  border: 3px dashed #000080;
 }
 
-.component-tooltip .tt-desc {
-  color: #444;
-  margin-top: 2px;
+.drop-zone-content {
+  text-align: center;
+  padding: 30px;
 }
 
-.component-tooltip .tt-pins {
-  margin-top: 4px;
+.drop-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.drop-text {
   font-family: var(--font-mono);
+  font-size: 20px;
+  color: #000080;
+  margin-bottom: 6px;
+}
+
+.drop-hint {
   font-size: 12px;
-  color: #006600;
+  color: #808080;
+  margin-bottom: 16px;
 }
 
-/* ========== DRAG PREVIEW ========== */
-#drag-preview {
-  position: fixed;
-  pointer-events: none;
-  z-index: 5000;
-  opacity: 0.7;
+.open-file-btn {
+  padding: 6px 24px !important;
+  font-size: 14px !important;
+  margin-bottom: 16px;
 }
 
-/* ========== CONTEXT MENU ========== */
-.context-menu {
-  position: fixed;
-  background: var(--bg);
-  border: 2px solid;
-  border-color: var(--raised-outer) var(--sunken-outer) var(--sunken-outer) var(--raised-outer);
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
-  z-index: 10000;
-  min-width: 160px;
-  padding: 2px;
+.drop-demos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-size: 11px;
+  color: #808080;
 }
 
-.ctx-entry {
-  padding: 4px 24px 4px 8px;
-  cursor: default;
-  font-size: 12px;
+/* ========== TOOLBAR EXTRAS ========== */
+.open-btn {
+  background: #D0D0FF !important;
 }
 
-.ctx-entry:hover {
-  background: var(--highlight);
-  color: var(--highlight-text);
-}
-
-.ctx-separator {
-  height: 1px;
-  margin: 3px 4px;
-  border-top: 1px solid var(--bg-dark);
-  border-bottom: 1px solid var(--white);
+.toolbar-info {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--bg-darker);
+  padding: 0 8px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ========== CRT SCANLINE OVERLAY (subtle) ========== */
